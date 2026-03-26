@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+
+
+from argparse import ArgumentParser, Namespace
+from datetime import datetime
+from grp import getgrgid
+import json
+from typing import TypedDict
+from os import stat, stat_result, system
+from pathlib import PosixPath
+from pwd import getpwuid
+from stat import filemode
+from subprocess import run
+
+from magic import Magic
+
+
+class Metadata(TypedDict):
+    canonical_path: str
+
+    filesystem_types: str
+    formatted_filesystem_types: str
+    mime_type: str
+
+    mime_encoding: str
+
+    file_mode: int
+    octal_file_mode: str
+    formatted_file_mode: str
+
+    inode_number: int
+    filesystem_identifier: int
+    hard_link_count: int
+
+
+    user_identifier: int
+    username: str
+
+    group_identifier: int
+    group_name: str
+
+
+    byte_size: int
+    formatted_size: str
+
+
+    access_timestamp: float
+    formatted_access_timestamp: str
+
+    modification_timestamp: float
+    formatted_modification_timestamp: str
+
+    change_timestamp: float
+    formatted_change_timestamp: str
+
+    birth_timestamp: float
+    formatted_birth_timestamp: str
+
+
+def get_arguments() -> Namespace:
+    argument_parser: ArgumentParser = ArgumentParser()
+
+    argument_parser.add_argument('paths', nargs = '+', type = PosixPath)
+    argument_parser.add_argument('-j', '--json', type = PosixPath, help = 'path to json file')
+    argument_parser.add_argument('-m', '--metric', action = 'store_true', help = 'format size (metric)')
+    argument_parser.add_argument('-q', '--quiet', action = 'store_true', help = 'quiet (no output)')
+    argument_parser.add_argument('-v', '--verbose', action = 'store_true', help = 'be verbose (show additional information)')
+
+    return argument_parser.parse_args()
+
+def get_filesystem_types(path: PosixPath) -> list[str]:
+    types: list[str] = []
+
+    if path.is_block_device():                types += ['Block Device']
+    if path.is_char_device():                 types += ['Character Device']
+    if path.is_dir(follow_symlinks = False):  types += ['Directory']
+    if path.is_fifo():                        types += ['FIFO']
+    if path.is_file(follow_symlinks = False): types += ['File']
+    if path.is_junction():                    types += ['Junction']
+    if path.is_mount():                       types += ['Mount Point']
+    if path.is_socket():                      types += ['Socket']
+    if path.is_symlink():                     types += ['Symbolic Link']
+
+    return types or ['Unknown']
+
+def get_mime_metadata(path: PosixPath) -> list[str]:
+    try:
+        return Magic(mime = True, mime_encoding = True).from_file(path).split('; ', 1)
+
+    except IsADirectoryError:
+        return ['Unknown', 'Unknown']
+
+
+def format_size(byte_size: int, metric: bool) -> str:
+    size: float = float(byte_size)
+    divisor: int = 1000 if metric else 1024
+    units: list[str] = ['B', 'MB', 'GB', 'TB', 'PB', 'EB'] if metric else ['B', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB']
+    for unit in units[:-1]:
+        if size < divisor:
+            return f'{round(size, 1):g} {unit}'
+
+        size /= divisor
+
+    return f'{round(size, 1):g} {units[-1]}'
+
+def format_timestamp(timestamp: float) -> str:
+    return datetime.fromtimestamp(timestamp).astimezone().strftime('%c %Z')
+
+
+def main() -> None:
+    arguments: Namespace = get_arguments()
+
+    if arguments.json:
+        json_output: dict[str, PosixPath] = {}
+
+    path: PosixPath
+    for path in arguments.paths:
+        path_string: str = str(path)
+        filesystem_types: list[str] = get_filesystem_types(path)
+        mime_metadata: list[str] = get_mime_metadata(path)
+        stats: stat_result = stat(path)
+        birth_time: float = float(run(['/usr/bin/stat', '--format="%W"', path], capture_output = True, text = True).stdout.replace('"', ''))
+        metadata: Metadata = {
+                              'canonical_path': str(path.resolve()),
+                            'filesystem_types': filesystem_types,
+                  'formatted_filesystem_types': ", ".join(filesystem_types),
+                                   'mime_type': mime_metadata[0],
+                               'mime_encoding': mime_metadata[1],
+                                   'file_mode': stats.st_mode,
+                             'octal_file_mode': oct(stats.st_mode),
+                         'formatted_file_mode': filemode(stats.st_mode),
+                                'inode_number': stats.st_ino,
+                       'filesystem_identifier': stats.st_dev,
+                             'hard_link_count': stats.st_nlink,
+                             'user_identifier': stats.st_uid,
+                                    'username': getpwuid(stats.st_uid).pw_name,
+                            'group_identifier': stats.st_gid,
+                                  'group_name': getgrgid(stats.st_gid).gr_name,
+                                   'byte_size': stats.st_size,
+                              'formatted_size': format_size(stats.st_size, arguments.metric),
+                            'access_timestamp': stats.st_atime,
+                  'formatted_access_timestamp': format_timestamp(stats.st_atime),
+                      'modification_timestamp': stats.st_mtime,
+            'formatted_modification_timestamp': format_timestamp(stats.st_mtime),
+                            'change_timestamp': stats.st_ctime,
+                  'formatted_change_timestamp': format_timestamp(stats.st_ctime),
+                             'birth_timestamp': birth_time,
+                   'formatted_birth_timestamp': format_timestamp(birth_time)
+        }
+
+        if not arguments.quiet:
+            print(f'''
+                    Path: {path}
+          Canonical Path: {metadata["canonical_path"]}
+        Filesystem Types: {metadata["formatted_filesystem_types"]}
+               MIME Type: {metadata["mime_type"]}
+           MIME Encoding: {metadata["mime_encoding"]}
+               File Mode: {metadata["formatted_file_mode"]}
+            Inode Number: {metadata["inode_number"]}
+   Filesystem Identifier: {metadata["filesystem_identifier"]}
+         Hard Link Count: {metadata["hard_link_count"]}
+                    User: {metadata["username"]}{f" ({metadata['user_identifier']})" if arguments.verbose else ""}
+                   Group: {metadata["group_name"]}{f" ({metadata['group_identifier']})" if arguments.verbose else ""}
+                    Size: {metadata["formatted_size"]}{f" ({metadata['byte_size']} B)" if arguments.verbose else ""}
+        Access Timestamp: {metadata["formatted_access_timestamp"]}{f" ({metadata['access_timestamp']})" if arguments.verbose else ""}
+  Modification Timestamp: {metadata["formatted_modification_timestamp"]}{f" ({metadata['modification_timestamp']})" if arguments.verbose else ""}
+        Change Timestamp: {metadata["formatted_change_timestamp"]}{f" ({metadata['change_timestamp']})" if arguments.verbose else ""}
+         Birth Timestamp: {metadata["formatted_birth_timestamp"]}
+''')
+
+        if arguments.json:
+            json_output[path_string] = metadata
+
+    if arguments.json:
+        with open(arguments.json, 'w') as json_file:
+            json.dump(json_output, json_file, indent = 2)
+
+if __name__ == '__main__':
+    main()
