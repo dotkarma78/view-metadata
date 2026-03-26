@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+
+
+from argparse import ArgumentParser, Namespace
+from datetime import datetime
+from grp import getgrgid
+from mimetypes import guess_type
+from os import stat, stat_result
+from pathlib import Path
+from pwd import getpwuid
+from stat import filemode
+
+
+def format_type(path: Path) -> str:
+    mime_type, _ = guess_type(path)[0]
+    if not mime_type:
+        return 'Unknown'
+    category, subtype = mime_type.split('/', 1)
+    return f'{"Plain" if subtype == "plain" else subtype.upper()} {category.capitalize()}'
+
+
+def format_size(byte_size: int, metric: bool) -> str:
+    units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'] if metric else ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB']
+    divisor = 1000 if metric else 1024
+    size: int = float(byte_size)
+
+    for unit in units[:-1]:
+        if size < divisor:
+            return f'{round(size, 1):g} {unit}'
+
+        size /= divisor
+
+    return f'{round(size, 1):g} {units[-1]}'
+
+
+def main() -> None:
+    argument_parser: ArgumentParser = ArgumentParser()
+
+    argument_parser.add_argument('file', type = str)
+    argument_parser.add_argument('-M', '--metric', action = 'store_true')
+    argument_parser.add_argument('-R', '--raw', action = 'store_true')
+
+    arguments: Namespace = argument_parser.parse_args()
+
+
+    path: Path = Path(arguments.file)
+    metadata: stat_result = stat(path)
+
+
+    formatted_metadata: str = \
+f'''
+           Relative Path: {path}
+           Absolute Path: {path.resolve()}
+               MIME Type: {guess_type(path)[0] or 'unknown/unknown'}
+
+                    Mode: {metadata.st_mode}
+                   Inode: {metadata.st_ino}
+           Filesystem ID: {metadata.st_dev}
+         Hard Link Count: {metadata.st_nlink}
+                 User ID: {metadata.st_uid}
+                Group ID: {metadata.st_gid}
+               Byte Size: {metadata.st_size}
+        Access Timestamp: {metadata.st_atime}
+  Modification Timestamp: {metadata.st_mtime}
+        Change Timestamp: {metadata.st_ctime}
+''' if arguments.raw else \
+f'''
+           Relative Path: {path}
+           Absolute Path: {path.resolve()}
+                    Type: {format_type(path)}
+
+                    Mode: {filemode(metadata.st_mode)} ({oct(metadata.st_mode)})
+                   Inode: {metadata.st_ino}
+           Filesystem ID: {metadata.st_dev}
+         Hard Link Count: {metadata.st_nlink}
+                Username: {getpwuid(metadata.st_uid).pw_name}
+              Group Name: {getgrgid(metadata.st_gid).gr_name}
+                    Size: {format_size(metadata.st_size, arguments.metric)}
+        Access Timestamp: {datetime.fromtimestamp(metadata.st_atime).astimezone().strftime('%c %Z')}
+  Modification Timestamp: {datetime.fromtimestamp(metadata.st_mtime).astimezone().strftime('%c %Z')}
+        Change Timestamp: {datetime.fromtimestamp(metadata.st_ctime).astimezone().strftime('%c %Z')}
+'''
+
+    print(formatted_metadata)
+
+
+if __name__ == '__main__':
+    main()
