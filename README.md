@@ -35,5 +35,5 @@ vmd foo.txt -j bar.json
   -j, --json JSON  Path to json file
   -m, --metric     Format size (metric)
   -q, --quiet      Quiet (no output)
-  -v, --verbose    Show additional information
+  -v, --verbose    Be verbose (Show additional information)
 ```
