@@ -1,39 +1,33 @@
-# View Metadata Tool (vmd)
+# View Metadata
 
-This tool allows you to see metadata for any file, partition, and drive, 
-as well as the specific block device, character device, FIFO, junction, mount point, socket, and symbolic link.
+View Metadata (VMD) is a CLI tool used for inspecting, parsing, and serializing metadata of files.
 
-This tool will also allow you to put the metadata you aquire into a .JSON file, making it particularly useful for most use applications
+## Features
 
+VMD:
 
----
+- inspects one or more paths provided,
+- detects filesystem types (block devices, character devices, directories, FIFOs, files, junctions, mount points, sockets, and symbolic links),
+- as well as MIME types and encodings through the `magic` Python package,
+- reports relevant metadata,
+- formats for human parsing, and optionally serializes to JSON.
 
-# How to use
+## Usage
 
-To use this metadata reader, you can type in the help command below to see the available options
+VMD can be utilized by running `vmd` followed by parameters.
 
-```
-vmd -h
-```
----
-**Example commands:**
-
-```
-vmd foo.txt
-```
-^^^ Shows metadata for file "foo.txt"
+### VMD Help Menu
 
 ```
-vmd foo.txt -j bar.json
-```
-^^^ Puts the metadata for "foo.txt" into a JSON file called "bar.json"
+usage: vmd [-h] [-j JSON] [-m] [-q] [-v] paths [paths ...]
 
----
-# Options
-  ```
-  -h, --help       Shows this help message and exit
-  -j, --json JSON  Path to json file
-  -m, --metric     Format size (metric)
-  -q, --quiet      Quiet (no output)
-  -v, --verbose    Be verbose (Show additional information)
+positional arguments:
+  paths
+
+options:
+  -h, --help       show this help message and exit
+  -j, --json JSON  path to json file
+  -m, --metric     format size (metric)
+  -q, --quiet      quiet (no output)
+  -v, --verbose    be verbose (show additional information)
 ```
