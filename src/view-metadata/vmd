@@ -94,7 +94,7 @@ def get_mime_metadata(path: PosixPath) -> list[str]:
 def format_size(byte_size: int, metric: bool) -> str:
     size: float = float(byte_size)
     divisor: int = 1000 if metric else 1024
-    units: list[str] = ['B', 'MB', 'GB', 'TB', 'PB', 'EB'] if metric else ['B', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB']
+    units: list[str] = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB'] if metric else ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB']
     for unit in units[:-1]:
         if size < divisor:
             return f'{round(size, 1):g} {unit}'
