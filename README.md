@@ -18,7 +18,7 @@ VMD can be utilized by running `vmd` followed by parameters.
 
 ### VMD Help Menu
 
-```
+```bash
 usage: vmd [-h] [-j JSON] [-m] [-q] [-v] paths [paths ...]
 
 positional arguments:
@@ -31,3 +31,11 @@ options:
   -q, --quiet      quiet (no output)
   -v, --verbose    be verbose (show additional information)
 ```
+
+### Example Command
+
+```bash
+vmd foo.txt -j bar.json
+```
+
+This command will inspect the metadata of a file called `foo.txt`, output it in a human-readable format into the terminal, and finally serialize it into a JSON file called `bar.json`.
