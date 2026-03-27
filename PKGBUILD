@@ -8,7 +8,7 @@ arch=('any')
 depends=('python' 'python-magic')
 
 source=('https://github.com/dotkarma78/view-metadata.git')
-sha256sums=('cc02b2bdeb8ca788dfd45f910db9ee4ebb468985af89e5886e68148c8e2832a3')
+sha256sums=('902d4c982e08fb4cea2872e6716b1cdad1b00caa09d2f0e37f4103d8754820ad')
 
 package() {
     install -Dm755 "$srcdir/view-metadata/vmd" "$pkgdir/usr/bin/vmd"
