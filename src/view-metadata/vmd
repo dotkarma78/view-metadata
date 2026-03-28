@@ -43,6 +43,9 @@ class Metadata(TypedDict):
     byte_size: int
     formatted_size: str
 
+    total_byte_size: int
+    formatted_total_size: str
+
 
     access_timestamp: float
     formatted_access_timestamp: str
@@ -115,35 +118,53 @@ def main() -> None:
 
     path: PosixPath
     for path in arguments.paths:
-        path_string: str = str(path)
         filesystem_types: list[str] = get_filesystem_types(path)
         mime_metadata: list[str] = get_mime_metadata(path)
         stats: stat_result = lstat(path)
+        total_byte_size: int = int(run(['/usr/bin/du', '-bs', path], capture_output = True, text = True).stdout.split('\t')[0])
         birth_time: float = float(run(['/usr/bin/stat', '--format="%W"', path], capture_output = True, text = True).stdout.strip(' "\n'))
         metadata: Metadata = {
                               'canonical_path': str(path.resolve()),
+
                             'filesystem_types': filesystem_types,
                   'formatted_filesystem_types': ", ".join(filesystem_types),
                                    'mime_type': mime_metadata[0],
+
                                'mime_encoding': mime_metadata[1],
+
                                    'file_mode': stats.st_mode,
                              'octal_file_mode': oct(stats.st_mode),
                          'formatted_file_mode': filemode(stats.st_mode),
+
                                 'inode_number': stats.st_ino,
                        'filesystem_identifier': stats.st_dev,
+
                              'hard_link_count': stats.st_nlink,
+
+
                              'user_identifier': stats.st_uid,
                                     'username': getpwuid(stats.st_uid).pw_name,
+
                             'group_identifier': stats.st_gid,
                                   'group_name': getgrgid(stats.st_gid).gr_name,
+
+
                                    'byte_size': stats.st_size,
                               'formatted_size': format_size(stats.st_size, arguments.metric),
+
+                             'total_byte_size': total_byte_size,
+                        'formatted_total_size': format_size(total_byte_size, arguments.metric),
+
+
                             'access_timestamp': stats.st_atime,
                   'formatted_access_timestamp': format_timestamp(stats.st_atime),
+
                       'modification_timestamp': stats.st_mtime,
             'formatted_modification_timestamp': format_timestamp(stats.st_mtime),
+
                             'change_timestamp': stats.st_ctime,
                   'formatted_change_timestamp': format_timestamp(stats.st_ctime),
+
                              'birth_timestamp': birth_time,
                    'formatted_birth_timestamp': format_timestamp(birth_time)
         }
@@ -164,10 +185,11 @@ def main() -> None:
    
          Hard Link Count: {metadata["hard_link_count"]}
          
-                    User: {metadata["username"]}{f" ({metadata['user_identifier']})" if arguments.verbose else ""}
-                   Group: {metadata["group_name"]}{f" ({metadata['group_identifier']})" if arguments.verbose else ""}
+{"User".rjust(24) if arguments.verbose else "Username".rjust(24)}: {metadata["username"]}{f" ({metadata['user_identifier']})" if arguments.verbose else ""}
+{"Group".rjust(24) if arguments.verbose else "Group Name".rjust(24)}: {metadata["group_name"]}{f" ({metadata['group_identifier']})" if arguments.verbose else ""}
                    
-            Size on Disk: {metadata["formatted_size"]}{f" ({metadata['byte_size']} B)" if arguments.verbose else ""}
+                    Size: {metadata["formatted_size"]}{f" ({metadata['byte_size']} B)" if arguments.verbose else ""}
+              Total Size: {metadata["formatted_total_size"]}{f" ({metadata['total_byte_size']} B)" if arguments.verbose else ""}
             
         Access Timestamp: {metadata["formatted_access_timestamp"]}{f" ({metadata['access_timestamp']})" if arguments.verbose else ""}
   Modification Timestamp: {metadata["formatted_modification_timestamp"]}{f" ({metadata['modification_timestamp']})" if arguments.verbose else ""}
@@ -176,7 +198,7 @@ def main() -> None:
 ''')
 
         if arguments.json:
-            json_output[path_string] = metadata
+            json_output[str(path)] = metadata
 
     if arguments.json:
         with open(arguments.json, 'w') as json_file:
