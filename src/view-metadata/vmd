@@ -94,6 +94,23 @@ def get_mime_metadata(path: PosixPath) -> list[str]:
         return ['Unknown', 'Unknown']
 
 
+def get_total_byte_size(path: PosixPath) -> int:
+    total: int = 0
+
+    file: PosixPath
+    for file in path.rglob('*'):
+        try:
+            total += file.stat().st_size
+            if file.is_symlink():
+                total += file.lstat().st_size
+
+        except FileNotFoundError:
+            pass
+
+
+    return total
+
+
 def format_size(byte_size: int, metric: bool) -> str:
     size: float = float(byte_size)
     divisor: int = 1000 if metric else 1024
@@ -112,16 +129,14 @@ def format_timestamp(timestamp: float) -> str:
 
 def main() -> None:
     arguments: Namespace = get_arguments()
-
-    if arguments.json:
-        json_output: dict[str, Metadata] = {}
+    json_output: dict[str, Metadata] = {}
 
     path: PosixPath
     for path in arguments.paths:
         filesystem_types: list[str] = get_filesystem_types(path)
         mime_metadata: list[str] = get_mime_metadata(path)
         stats: stat_result = lstat(path)
-        total_byte_size: int = int(run(['/usr/bin/du', '-bs', path], capture_output = True, text = True).stdout.split('\t')[0])
+        total_byte_size: int = get_total_byte_size(path)
         birth_time: float = float(run(['/usr/bin/stat', '--format="%W"', path], capture_output = True, text = True).stdout.strip(' "\n'))
         metadata: Metadata = {
                               'canonical_path': str(path.resolve()),
